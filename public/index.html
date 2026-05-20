@@ -297,10 +297,16 @@
       document.getElementById('connectBtn').textContent =
         state === 'error' ? '🔄 Reintentar conexión' : '📱 Conectar WhatsApp';
       document.getElementById('disconnectBtn').classList.add('hidden');
+      // Reset data and UI completely
+      allContacts = filteredContacts = [];
+      const inp = document.getElementById('searchInput');
+      if (inp) inp.value = '';
+      document.getElementById('contactsTable').innerHTML = '';
+      document.getElementById('contactCount').textContent = '';
     } else {
       document.getElementById('disconnectBtn').classList.remove('hidden');
     }
-    if (state !== 'qr')   hide('qrSection');
+    if (state !== 'qr')    hide('qrSection');
     if (state !== 'ready') hide('contactsSection');
   }
 
@@ -387,8 +393,8 @@
   function exportCSV() {
     if (!allContacts.length) return;
     const BOM = '\uFEFF';
-    const header = 'Nombre,Teléfono\r\n';
-    const rows = allContacts.map(c => `"${c.name.replace(/"/g,'""')}","${c.number}"`).join('\r\n');
+    const header = 'Nombre;Teléfono\r\n';
+    const rows = allContacts.map(c => `"${c.name.replace(/"/g,'""')}";"${c.number}"`).join('\r\n');
     const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = Object.assign(document.createElement('a'), {

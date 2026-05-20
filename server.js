@@ -110,20 +110,28 @@ function startWhatsApp() {
   });
 
   whatsappClient.on('ready', async () => {
+    const activeClient = whatsappClient;
+    if (!activeClient) return;
+
     clientState = 'ready';
     io.emit('state', 'ready');
     io.emit('status', { type: 'loading', message: 'Obteniendo contactos de tu agenda...' });
 
     try {
-      const allContacts = await whatsappClient.getContacts();
+      const allContacts = await activeClient.getContacts();
 
+      const seenNumbers = new Set();
       const contacts = allContacts
-        .filter(c => c.isMyContact && c.number && !c.isGroup)
+        .filter(c => {
+          if (!c.isMyContact || !c.number || c.isGroup) return false;
+          if (seenNumbers.has(c.number)) return false;
+          seenNumbers.add(c.number);
+          return true;
+        })
         .map(c => ({
           name: c.name || c.pushname || ('+' + c.number),
           number: '+' + c.number
         }))
-        .filter((c, i, arr) => arr.findIndex(x => x.number === c.number) === i)
         .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
 
       cachedContacts = contacts;
