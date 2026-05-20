@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Contactos — Exportar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --wa-green: #25D366;
+      --wa-teal: #00A884;
+      --wa-bg: #0A1014;
+      --wa-panel: #1F2C33;
+      --wa-panel2: #182229;
+      --wa-border: #2A3942;
+      --wa-text: #E8E8E8;
+      --wa-muted: #8696A0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background-color: var(--wa-bg);
+      color: var(--wa-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* Animations */
+    @keyframes spin     { to   { transform: rotate(360deg); } }
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pulseGlow {
+      0%,100% { box-shadow: 0 0 18px rgba(37,211,102,.25); }
+      50%     { box-shadow: 0 0 36px rgba(37,211,102,.6);  }
+    }
+    @keyframes bgShift {
+      0%   { background-position: 0% 50%;   }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%;   }
+    }
+
+    .spinner   { animation: spin 0.85s linear infinite; }
+    .fade-up   { animation: fadeUp 0.35s ease-out both; }
+    .qr-glow   { animation: pulseGlow 2.2s ease-in-out infinite; }
+
+    /* Gradient hero bar */
+    .hero-bar {
+      background: linear-gradient(135deg, #0d2e1e 0%, #0f2030 50%, #0d2e1e 100%);
+      background-size: 200% 200%;
+      animation: bgShift 8s ease infinite;
+      border-bottom: 1px solid var(--wa-border);
+    }
+
+    /* Buttons */
+    .btn { border:none; cursor:pointer; font-weight:600; border-radius:9999px; transition: opacity .15s, transform .12s, box-shadow .15s; }
+    .btn:active { transform: scale(.96); }
+    .btn-connect {
+      background: var(--wa-green); color: #0A1014;
+      padding: 14px 36px; font-size: 16px;
+      box-shadow: 0 4px 24px rgba(37,211,102,.35);
+    }
+    .btn-connect:hover { opacity:.88; box-shadow: 0 6px 32px rgba(37,211,102,.5); }
+    .btn-sm { padding: 8px 16px; font-size: 13px; border-radius: 8px; }
+    .btn-csv  { background: var(--wa-teal); color: #fff; }
+    .btn-csv:hover { opacity:.82; }
+    .btn-print { background: var(--wa-panel); color: var(--wa-text); border: 1px solid var(--wa-border); }
+    .btn-print:hover { background: var(--wa-border); }
+    .btn-danger { background: #3D1B1B; color: #E05D4B; border: 1px solid #5a2020; }
+    .btn-danger:hover { background: #4d2020; }
+    .btn-ghost  { background: transparent; color: var(--wa-muted); border: 1px solid var(--wa-border); font-size:12px; border-radius:8px; padding: 4px 12px; cursor:pointer; }
+    .btn-ghost:hover { color: var(--wa-text); border-color: var(--wa-muted); }
+
+    /* Search input */
+    .search-input {
+      background: var(--wa-panel2);
+      border: 1px solid var(--wa-border);
+      color: var(--wa-text);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+      min-width: 0;
+      flex: 1;
+    }
+    .search-input:focus { border-color: var(--wa-teal); }
+    .search-input::placeholder { color: var(--wa-muted); }
+
+    /* Table */
+    .contact-row { border-bottom: 1px solid var(--wa-border); transition: background .1s; }
+    .contact-row:last-child { border-bottom: none; }
+    .contact-row:hover { background: rgba(255,255,255,.04); }
+
+    /* Status pill */
+    .status-pill {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-radius: 12px;
+      border: 1px solid var(--wa-border);
+      background: var(--wa-panel);
+      font-size: 13px;
+      transition: background .2s, border-color .2s;
+    }
+
+    /* Card */
+    .card { background: var(--wa-panel); border: 1px solid var(--wa-border); border-radius: 16px; }
+
+    /* Done banner */
+    .done-banner {
+      background: linear-gradient(135deg, #0d2e1e, #0f2030);
+      border: 1px solid #1a4a2e;
+      border-radius: 14px;
+      padding: 16px 20px;
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      #appView   { display: none !important; }
+      #printView { display: block !important; }
+      body { background: white !important; color: black !important; }
+    }
+    #printView { display: none; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--wa-bg); }
+    ::-webkit-scrollbar-thumb { background: var(--wa-border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ======================== APP VIEW ======================== -->
+<div id="appView">
+
+  <!-- Hero header -->
+  <div class="hero-bar px-4 py-6 mb-8 text-center">
+    <div class="flex items-center justify-center gap-3 mb-1">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2C6.48 2 2 6.48 2 12c0 1.93.52 3.74 1.43 5.29L2.05 22l4.82-1.36A9.96 9.96 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" fill="#25D366"/>
+        <path d="M16.76 14.36c-.22-.11-1.31-.65-1.51-.72-.2-.07-.35-.11-.49.1-.14.21-.57.71-.7.86-.13.14-.25.16-.47.04-.22-.11-.93-.35-1.77-1.1-.66-.58-1.1-1.31-1.23-1.52-.12-.22-.02-.33.09-.45.11-.11.22-.28.34-.41.12-.12.15-.21.22-.35.07-.15.04-.27-.02-.39-.05-.11-.49-1.2-.68-1.65-.18-.43-.36-.37-.5-.38-.13-.01-.27-.01-.42-.01-.14 0-.37.06-.58.28-.2.21-.77.73-.77 1.83 0 1.09.79 2.15.91 2.3.12.15 1.54 2.34 3.72 3.28.52.22.93.35 1.24.45.52.17.99.14 1.37.09.42-.06 1.29-.54 1.47-1.08.18-.54.18-1 .12-1.1-.06-.1-.12.04-.34-.07z" fill="white"/>
+      </svg>
+      <h1 style="font-size:26px; font-weight:700; color:var(--wa-green); margin:0;">WhatsApp Contactos</h1>
+    </div>
+    <p style="color:var(--wa-muted); font-size:13px; margin:0;">Exportá todos tus contactos en segundos · Sin registro en el servidor</p>
+  </div>
+
+  <div class="max-w-3xl mx-auto px-4 pb-16">
+
+    <!-- Connect Button -->
+    <div id="connectSection" class="text-center mb-8 fade-up">
+      <button id="connectBtn" onclick="connectWhatsApp()" class="btn btn-connect">
+        📱 Conectar WhatsApp
+      </button>
+      <p class="mt-4 text-sm" style="color:var(--wa-muted);">Necesitás tener WhatsApp en tu teléfono para escanear el QR</p>
+    </div>
+
+    <!-- Status Bar -->
+    <div id="statusBar" class="hidden mb-5 fade-up">
+      <div id="statusContent" class="status-pill">
+        <div id="statusIcon" class="flex-shrink-0"></div>
+        <span id="statusText"></span>
+        <button id="disconnectBtn" onclick="disconnectWhatsApp()" class="btn-ghost ml-auto hidden">
+          Desconectar
+        </button>
+      </div>
+    </div>
+
+    <!-- QR Section -->
+    <div id="qrSection" class="hidden text-center mb-8 fade-up">
+      <div class="card inline-block p-3 mb-5">
+        <p class="text-sm mb-4 px-2" style="color:var(--wa-muted); max-width:340px; margin:0 auto 16px;">
+          Abrí WhatsApp → <strong style="color:var(--wa-text);">⋮ Menú</strong> → <strong style="color:var(--wa-text);">Dispositivos vinculados</strong> → <strong style="color:var(--wa-text);">Vincular dispositivo</strong>
+        </p>
+        <div class="qr-glow inline-block" style="background:white; border-radius:12px; padding:12px;">
+          <img id="qrImage" src="" alt="QR Code" style="width:220px; height:220px; display:block;" />
+        </div>
+        <p class="text-xs mt-4" style="color:var(--wa-muted);">El código se renueva automáticamente si expira</p>
+      </div>
+    </div>
+
+    <!-- Contacts Section -->
+    <div id="contactsSection" class="hidden fade-up">
+
+      <!-- Action bar -->
+      <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;">
+        <div>
+          <h2 style="font-size:17px; font-weight:700; margin:0 0 2px;">Contactos</h2>
+          <p id="contactCount" style="font-size:12px; color:var(--wa-muted); margin:0;"></p>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; flex:1; justify-content:flex-end; min-width:0;">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="🔍 Buscar nombre o número..."
+            oninput="filterContacts(this.value)"
+            class="search-input"
+            style="max-width:220px;"
+          />
+          <button onclick="exportCSV()" class="btn btn-sm btn-csv">📥 Descargar Excel</button>
+          <button onclick="window.print()" class="btn btn-sm btn-print">🖨️ Imprimir</button>
+        </div>
+      </div>
+
+      <!-- Table card -->
+      <div class="card overflow-hidden" style="border-radius:14px;">
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13.5px;">
+            <thead>
+              <tr style="background:var(--wa-panel2);">
+                <th style="padding:10px 16px; text-align:left; color:var(--wa-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px; width:46px;">#</th>
+                <th style="padding:10px 16px; text-align:left; color:var(--wa-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Nombre</th>
+                <th style="padding:10px 16px; text-align:left; color:var(--wa-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Teléfono</th>
+              </tr>
+            </thead>
+            <tbody id="contactsTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Danger zone -->
+      <div class="done-banner mt-6" style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between;">
+        <div>
+          <p style="margin:0; font-size:13px; font-weight:600; color:var(--wa-text);">¿Ya guardaste tus contactos?</p>
+          <p style="margin:4px 0 0; font-size:12px; color:var(--wa-muted);">Borrá la sesión del servidor para no dejar ningún registro.</p>
+        </div>
+        <button onclick="cleanupSession()" class="btn btn-sm btn-danger" style="white-space:nowrap;">
+          🗑️ Finalizar y borrar datos
+        </button>
+      </div>
+
+      <p style="font-size:11px; text-align:center; color:#3D4A52; margin-top:12px;">
+        Exportado el <span id="exportDate"></span>
+      </p>
+    </div>
+
+    <!-- Cleanup Done Banner -->
+    <div id="cleanupBanner" class="hidden fade-up text-center">
+      <div class="card" style="padding:32px 24px; border-color:#1a4a2e;">
+        <div style="font-size:40px; margin-bottom:12px;">✅</div>
+        <h2 style="font-size:18px; font-weight:700; color:var(--wa-green); margin:0 0 8px;">Listo. Sin rastros.</h2>
+        <p style="font-size:13px; color:var(--wa-muted); margin:0 0 20px;">La sesión fue eliminada del servidor. Podés cerrar esta pestaña.</p>
+        <button onclick="location.reload()" class="btn btn-connect" style="font-size:14px; padding:10px 28px;">
+          Nueva sesión
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ======================== PRINT VIEW ======================== -->
+<div id="printView">
+  <div style="padding:28px; font-family:Arial,sans-serif; color:#000;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2C6.48 2 2 6.48 2 12c0 1.93.52 3.74 1.43 5.29L2.05 22l4.82-1.36A9.96 9.96 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" fill="#25D366"/>
+        <path d="M16.76 14.36c-.22-.11-1.31-.65-1.51-.72-.2-.07-.35-.11-.49.1-.14.21-.57.71-.7.86-.13.14-.25.16-.47.04-.22-.11-.93-.35-1.77-1.1-.66-.58-1.1-1.31-1.23-1.52-.12-.22-.02-.33.09-.45.11-.11.22-.28.34-.41.12-.12.15-.21.22-.35.07-.15.04-.27-.02-.39-.05-.11-.49-1.2-.68-1.65-.18-.43-.36-.37-.5-.38-.13-.01-.27-.01-.42-.01-.14 0-.37.06-.58.28-.2.21-.77.73-.77 1.83 0 1.09.79 2.15.91 2.3.12.15 1.54 2.34 3.72 3.28.52.22.93.35 1.24.45.52.17.99.14 1.37.09.42-.06 1.29-.54 1.47-1.08.18-.54.18-1 .12-1.1-.06-.1-.12.04-.34-.07z" fill="white"/>
+      </svg>
+      <h1 style="font-size:20px; font-weight:bold; margin:0;">Lista de Contactos WhatsApp</h1>
+    </div>
+    <p id="printMeta" style="font-size:12px; color:#666; margin:0 0 18px;"></p>
+    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background:#f0f0f0;">
+          <th style="border:1px solid #ccc; padding:6px 10px; text-align:left; width:42px;">#</th>
+          <th style="border:1px solid #ccc; padding:6px 10px; text-align:left;">Nombre</th>
+          <th style="border:1px solid #ccc; padding:6px 10px; text-align:left;">Teléfono</th>
+        </tr>
+      </thead>
+      <tbody id="printTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ======================== SCRIPTS ======================== -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  let allContacts = [];
+  let filteredContacts = [];
+
+  socket.on('connect', () => console.log('Conectado al servidor'));
+  socket.on('state',    (s) => handleState(s));
+  socket.on('status',   (d) => showStatus(d));
+  socket.on('qr',       (url) => { document.getElementById('qrImage').src = url; show('qrSection'); });
+  socket.on('contacts', (c)   => { allContacts = filteredContacts = c; showContacts(c); });
+  socket.on('cleanup-done', () => {
+    hide('contactsSection');
+    hide('statusBar');
+    show('cleanupBanner');
+    allContacts = filteredContacts = [];
+  });
+
+  // ---- State ----
+  function handleState(state) {
+    const isIdle = state === 'idle' || state === 'error';
+    isIdle ? show('connectSection') : hide('connectSection');
+    if (isIdle) {
+      document.getElementById('connectBtn').textContent =
+        state === 'error' ? '🔄 Reintentar conexión' : '📱 Conectar WhatsApp';
+      document.getElementById('disconnectBtn').classList.add('hidden');
+    } else {
+      document.getElementById('disconnectBtn').classList.remove('hidden');
+    }
+    if (state !== 'qr')   hide('qrSection');
+    if (state !== 'ready') hide('contactsSection');
+  }
+
+  // ---- Status ----
+  function showStatus(data) {
+    show('statusBar');
+    document.getElementById('statusText').textContent = data.message;
+    const m = {
+      loading:       { bg:'var(--wa-panel)',  border:'var(--wa-border)', color:'var(--wa-muted)',  icon: spin() },
+      qr:            { bg:'#1B3040',          border:'#00A884',          color:'#00A884',           icon:'📱' },
+      success:       { bg:'#1B3D2B',          border:'#25D366',          color:'#25D366',           icon:'✓' },
+      done:          { bg:'#1B3D2B',          border:'#25D366',          color:'#25D366',           icon:'✓' },
+      authenticated: { bg:'#1B3D2B',          border:'#25D366',          color:'#25D366',           icon:'🔓' },
+      error:         { bg:'#3D1B1B',          border:'#E05D4B',          color:'#E05D4B',           icon:'✕' },
+      warning:       { bg:'#3D2E1B',          border:'#FFC107',          color:'#FFC107',           icon:'⚠' },
+    };
+    const s = m[data.type] || m.loading;
+    const c = document.getElementById('statusContent');
+    c.style.background   = s.bg;
+    c.style.borderColor  = s.border;
+    document.getElementById('statusText').style.color = s.color;
+    document.getElementById('statusIcon').innerHTML   = s.icon;
+  }
+
+  function spin() {
+    return `<div class="spinner" style="width:16px;height:16px;border:2px solid var(--wa-muted);border-top-color:transparent;border-radius:50%;display:inline-block;flex-shrink:0;"></div>`;
+  }
+
+  // ---- Actions ----
+  function connectWhatsApp() {
+    hide('connectSection');
+    socket.emit('connect-whatsapp');
+  }
+  function disconnectWhatsApp() {
+    socket.emit('disconnect-whatsapp');
+    hide('contactsSection');
+    hide('qrSection');
+    allContacts = filteredContacts = [];
+  }
+  function cleanupSession() {
+    if (!confirm('¿Eliminar la sesión del servidor? No quedarán datos guardados.')) return;
+    socket.emit('cleanup-session');
+  }
+
+  // ---- Contacts ----
+  function showContacts(contacts) {
+    show('contactsSection');
+    hide('qrSection');
+    document.getElementById('exportDate').textContent = new Date().toLocaleString('es-AR', {
+      day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+    document.getElementById('contactCount').textContent = `${contacts.length} contactos`;
+    renderTable(contacts);
+    buildPrintView(allContacts);
+    document.getElementById('contactsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderTable(contacts) {
+    const tbody = document.getElementById('contactsTable');
+    if (!contacts.length) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--wa-muted);">Sin resultados</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = contacts.map((c, i) => `
+      <tr class="contact-row">
+        <td style="padding:10px 16px;color:var(--wa-muted);font-size:12px;">${i + 1}</td>
+        <td style="padding:10px 16px;font-weight:500;">${esc(c.name)}</td>
+        <td style="padding:10px 16px;color:var(--wa-muted);font-family:monospace;font-size:13px;">${esc(c.number)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function filterContacts(term) {
+    const q = term.toLowerCase();
+    filteredContacts = allContacts.filter(c =>
+      c.name.toLowerCase().includes(q) || c.number.includes(q)
+    );
+    document.getElementById('contactCount').textContent =
+      `${filteredContacts.length} de ${allContacts.length} contactos`;
+    renderTable(filteredContacts);
+  }
+
+  // ---- Export CSV ----
+  function exportCSV() {
+    if (!allContacts.length) return;
+    const BOM = '\uFEFF';
+    const header = 'Nombre,Teléfono\r\n';
+    const rows = allContacts.map(c => `"${c.name.replace(/"/g,'""')}","${c.number}"`).join('\r\n');
+    const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+      href: url,
+      download: `contactos-whatsapp-${new Date().toISOString().slice(0,10)}.csv`
+    });
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---- Print ----
+  function buildPrintView(contacts) {
+    document.getElementById('printMeta').textContent =
+      `Total: ${contacts.length} contactos · ${new Date().toLocaleString('es-AR')}`;
+    document.getElementById('printTableBody').innerHTML = contacts.map((c, i) => `
+      <tr style="background:${i%2===0?'#fff':'#f9f9f9'};">
+        <td style="border:1px solid #ccc;padding:5px 10px;">${i+1}</td>
+        <td style="border:1px solid #ccc;padding:5px 10px;">${esc(c.name)}</td>
+        <td style="border:1px solid #ccc;padding:5px 10px;">${esc(c.number)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ---- Helpers ----
+  function show(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hide(id) { document.getElementById(id).classList.add('hidden'); }
+  function esc(s) {
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(s || ''));
+    return d.innerHTML;
+  }
+</script>
+</body>
+</html>
